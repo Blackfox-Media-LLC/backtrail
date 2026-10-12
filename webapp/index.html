@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Backtrail</title>
+<meta name="description" content="Off-grid messaging for goTenna Mesh and Meshtastic radios." />
+<meta name="theme-color" content="#0b120e" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" href="assets/icon-192.png" />
+<link rel="stylesheet" href="vendor/leaflet.css" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body data-tab="messages" class="offline">
+<!-- Launch screen: shown until the app is ready, then fades away -->
+<div class="splash" id="splash" aria-hidden="true">
+  <img class="splash-bg" src="assets/backtrail-hero.jpg" alt="" />
+  <div class="splash-center">
+    <img class="splash-art" src="assets/backtrail-hero.jpg" alt="Backtrail" width="1200" height="718" />
+    <div class="splash-tag">Off-grid messaging for goTenna Mesh&reg; &amp; Meshtastic&reg; radios</div>
+    <div class="pulse" aria-label="Loading"><span></span><span></span><span></span></div>
+  </div>
+</div>
+
+<header>
+  <div class="brand">Backtrail<small>Off-grid messaging &middot; works with goTenna Mesh&reg; &amp; Meshtastic&reg;</small></div>
+  <img class="logo-img" src="assets/fox-mark.png" alt="" width="91" height="30" />
+  <div class="spacer"></div>
+  <div class="status"><span class="dot" id="dot"></span><span id="statusText">No radio</span></div>
+  <button class="icon-btn ghost" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">&#9680;</button>
+  <button class="ghost desk-only" id="aboutBtn">About</button>
+</header>
+
+<nav class="tabbar" id="tabbar" aria-label="Sections">
+  <button data-tab="messages" class="active"><span class="t-ico">&#128172;</span>Messages<span class="badge hidden" id="unread"></span></button>
+  <button data-tab="map"><span class="t-ico">&#129517;</span>Map</button>
+  <button data-tab="people"><span class="t-ico">&#128101;</span>People</button>
+  <button data-tab="radios"><span class="t-ico">&#128225;</span>Radios</button>
+  <button data-tab="settings"><span class="t-ico">&#9881;&#65039;</span>Settings</button>
+</nav>
+
+<main>
+  <!-- ================= Messages ================= -->
+  <section class="view chat" data-view="messages">
+    <div class="sos-banner hidden" id="sosBanner" role="alert"></div>
+    <div class="chips" id="msgFilter" role="tablist" aria-label="Show">
+      <button data-filter="all" class="active">All</button>
+      <button data-filter="group">Group</button>
+      <button data-filter="direct">Direct</button>
+      <button data-filter="places">SOS &amp; places</button>
+    </div>
+    <div class="messages" id="messages" data-filter="all">
+      <div class="hero" id="hero">
+        <div class="hero-media">
+          <img src="assets/backtrail-hero.jpg" alt="Backtrail" width="1200" height="718" />
+        </div>
+        <div class="hero-text">
+          <strong>Bring your radio back to the trail.</strong>
+          Message off-grid with goTenna Mesh and Meshtastic radios. No cell service, no accounts, no servers.
+          <div class="hero-actions">
+            <button class="primary" data-connect="gotenna">Connect goTenna</button>
+            <button class="ghost" data-connect="meshtastic">Connect Meshtastic</button>
+          </div>
+        </div>
+      </div>
+      <div id="history"></div>
+    </div>
+    <div class="connect-strip" id="connectStrip">
+      <span>No radio connected.</span>
+      <button class="primary" data-connect="gotenna">goTenna</button>
+      <button class="ghost" data-connect="meshtastic">Meshtastic</button>
+    </div>
+    <div class="composer">
+      <div class="quick" id="quick">
+        <button class="sos-btn" id="sosBtn" title="Send an SOS with your location to everyone">SOS</button>
+        <button id="locBtn" title="Send your location">&#128205; Location</button>
+        <button data-checkin="I'm OK">&#9989; I'm OK</button>
+        <button data-checkin="On my way">On my way</button>
+        <button data-checkin="At camp">At camp</button>
+        <button data-checkin="Heading back">Heading back</button>
+        <button data-checkin="Need help">Need help</button>
+      </div>
+      <div class="row to-row">
+        <select id="netSel" title="Which network to send on">
+          <option value="both">Both networks</option>
+          <option value="gotenna">goTenna</option>
+          <option value="meshtastic">Meshtastic</option>
+        </select>
+        <select id="toSel" title="Who to send to"></select>
+        <input id="toCustom" class="hidden" placeholder="ID" spellcheck="false" autocapitalize="off" />
+        <label class="enc-toggle" title="Encrypt goTenna messages with your channel passphrase">
+          <input type="checkbox" id="encrypt" disabled /> &#128274;
+        </label>
+      </div>
+      <div class="send-row">
+        <textarea id="text" rows="1" placeholder="Message&hellip;" title="Enter to send, Shift+Enter for a new line" maxlength="2000" disabled></textarea>
+        <button class="primary" id="sendBtn" disabled aria-label="Send">Send</button>
+      </div>
+      <div class="note" id="sendStatus"></div>
+    </div>
+  </section>
+
+  <!-- ================= Map ================= -->
+  <section class="view map-view" data-view="map">
+    <div class="map-wrap">
+      <canvas id="radar" aria-label="Radar map of people and your trail"></canvas>
+      <div id="street" class="hidden"></div>
+      <div class="map-card hidden" id="mapCard"></div>
+      <button class="ghost map-mode" id="mapModeBtn">Street map</button>
+    </div>
+    <div class="map-bar">
+      <div class="map-stats"><span id="myPos">Locating&hellip;</span><span id="trailStats"></span></div>
+      <div class="btn-grid">
+        <button id="recBtn">&#9679; Record trail</button>
+        <button id="backBtn">&#10554; Back to start</button>
+        <button id="shareLocBtn">&#128205; Share location</button>
+        <button id="gpxBtn">Export GPX</button>
+        <button id="clearTrailBtn" class="ghost">Clear trail</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= People ================= -->
+  <section class="view stack" data-view="people">
+    <div class="panel">
+      <h2><span class="h-ico">&#128101;</span>Contacts</h2>
+      <div class="body">
+        <div class="btn-grid">
+          <button class="primary" id="scanBtn">Scan QR</button>
+          <button id="myQrBtn">My QR code</button>
+          <button class="ghost" id="addContactBtn">Add manually</button>
+        </div>
+        <div class="list" id="contactList"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2><span class="h-ico">&#128246;</span>Meshtastic nodes <span class="count" id="nodeCount"></span></h2>
+      <div class="body">
+        <div class="note" id="nodesNone">Connect a Meshtastic radio to see the other nodes on your mesh, with signal, hops, battery, and distance.</div>
+        <div class="list" id="nodeList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Radios ================= -->
+  <section class="view stack" data-view="radios">
+    <div class="panel">
+      <h2><span class="h-ico">&#128225;</span>goTenna Mesh</h2>
+      <div class="body">
+        <div class="note" id="noDevice">Turn on your goTenna Mesh, then connect. It may appear as
+          <em>&ldquo;Unknown or unsupported device&rdquo;</em> or by its address. That is normal.</div>
+        <div id="deviceInfo" class="hidden">
+          <div class="kv"><span class="k">Model</span><span class="v" id="dModel">&mdash;</span></div>
+          <div class="kv"><span class="k">Firmware</span><span class="v" id="dFw">&mdash;</span></div>
+          <div class="kv"><span class="k">Serial</span><span class="v" id="dSerial">&mdash;</span></div>
+          <div class="kv"><span class="k">Battery</span><span class="v" id="dBattPct">&mdash;</span></div>
+          <div class="battery"><span id="dBatt" style="width:0%"></span></div>
+          <label for="regionSel" style="margin-top:6px">RF region / band</label>
+          <div class="row">
+            <select id="regionSel">
+              <option value="1">North America (902&ndash;928 MHz)</option>
+              <option value="2">European Union (868 MHz)</option>
+              <option value="4">Australia</option>
+              <option value="5">New Zealand</option>
+              <option value="8">Japan</option>
+            </select>
+            <button id="regionBtn" style="flex:0 0 auto">Set</button>
+          </div>
+          <div class="note">Pick the region you are in. This only changes the band.</div>
+        </div>
+        <button class="primary" id="gtConnectBtn">Connect goTenna</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="h-ico">&#128246;</span>Meshtastic</h2>
+      <div class="body">
+        <div class="note" id="mtNone">Connect a Meshtastic radio to message LoRa mesh users, see nodes, and share
+          channels. Close the Meshtastic phone app first if it is connected to the radio.</div>
+        <div id="mtInfo" class="hidden">
+          <div class="kv"><span class="k">Name</span><span class="v" id="mtName">&mdash;</span></div>
+          <div class="kv"><span class="k">Node ID</span><span class="v mono" id="mtId">&mdash;</span></div>
+          <div class="kv"><span class="k">Hardware</span><span class="v" id="mtHw">&mdash;</span></div>
+          <div class="kv"><span class="k">Firmware</span><span class="v" id="mtFw">&mdash;</span></div>
+          <div class="kv"><span class="k">Region &middot; preset</span><span class="v" id="mtRadio">&mdash;</span></div>
+          <div class="kv"><span class="k">Role</span><span class="v" id="mtRole">&mdash;</span></div>
+          <div class="kv"><span class="k">Battery</span><span class="v" id="mtBatt">&mdash;</span></div>
+          <div class="kv"><span class="k">Channel use &middot; airtime</span><span class="v" id="mtUtil">&mdash;</span></div>
+          <div class="kv"><span class="k">Nodes heard</span><span class="v" id="mtNodes">0</span></div>
+          <h3 class="sub">Channels</h3>
+          <div class="list compact" id="chanList"></div>
+          <div class="btn-grid">
+            <button id="chanQrBtn">Share channels (QR)</button>
+            <button class="ghost" id="chanImportBtn">Import channel link</button>
+          </div>
+          <details class="cfg">
+            <summary>Radio settings</summary>
+            <div class="cfg-body">
+              <div class="row">
+                <div><label for="mtLong">Long name</label><input id="mtLong" maxlength="39" /></div>
+                <div style="flex:0 0 96px"><label for="mtShort">Short</label><input id="mtShort" maxlength="4" /></div>
+              </div>
+              <div><label for="mtRegionSel">Region</label><select id="mtRegionSel"></select></div>
+              <div><label for="mtPresetSel">Modem preset</label><select id="mtPresetSel"></select></div>
+              <div><label for="mtRoleSel">Device role</label><select id="mtRoleSel"></select></div>
+              <div><label for="mtSleepSel">Sleep when idle (saves battery)</label>
+                <select id="mtSleepSel">
+                  <option value="0">Never (stay awake)</option>
+                  <option value="60">After 1 minute</option>
+                  <option value="300">After 5 minutes</option>
+                  <option value="900">After 15 minutes</option>
+                  <option value="1800">After 30 minutes</option>
+                </select></div>
+              <div class="note">Region must match where you are. Every radio on a mesh must use the same preset. A sleeping
+                radio turns Bluetooth off until it wakes; Backtrail keeps it awake while connected. Saving may restart
+                the radio.</div>
+              <div class="row">
+                <button class="primary" id="mtSaveBtn">Save to radio</button>
+                <button class="ghost" id="mtRebootBtn" style="flex:0 0 auto">Reboot</button>
+              </div>
+            </div>
+          </details>
+        </div>
+        <div class="row">
+          <button class="primary" id="mtConnectBtn">Connect via Bluetooth</button>
+          <button class="ghost hidden" id="mtUsbBtn">Connect via USB</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="h-ico">&#8644;</span>Network tools</h2>
+      <div class="body">
+        <label class="switch"><input type="checkbox" id="bridge" disabled /> <span>Relay between goTenna and Meshtastic</span></label>
+        <div class="note">Relays group messages only; direct messages are never relayed. Needs both radios connected.</div>
+        <label class="switch"><input type="checkbox" id="rangeTest" disabled /> <span>Range test (send a numbered ping every 60 seconds)</span></label>
+        <div class="note">Walk away with a second radio and watch which pings arrive, with signal strength.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Settings ================= -->
+  <section class="view stack" data-view="settings">
+    <div class="panel">
+      <h2><span class="h-ico">&#129418;</span>Your identity</h2>
+      <div class="body">
+        <div>
+          <label for="nick">Nickname</label>
+          <input id="nick" placeholder="e.g. Pat" maxlength="30" />
+        </div>
+        <div>
+          <label for="gid">Your goTenna ID (share it so people can send you direct messages)</label>
+          <input id="gid" spellcheck="false" class="mono" />
+        </div>
+        <div>
+          <label for="passphrase">Group passphrase (encrypts goTenna messages)</label>
+          <div class="row">
+            <input id="passphrase" type="password" autocomplete="off" placeholder="shared with your group" />
+            <button class="ghost icon-btn" id="showPass" style="flex:0 0 auto" title="Show/hide" aria-label="Show or hide passphrase">&#128065;</button>
+          </div>
+        </div>
+        <button class="primary" id="saveId">Save identity</button>
+        <div class="note" id="keyStatus">No passphrase set. goTenna messages are sent unencrypted.</div>
+        <div class="btn-grid">
+          <button id="myQrBtn2">My QR code</button>
+          <button id="inviteBtn">Group invite QR</button>
+        </div>
+        <div class="note">Stored only on this device. No account, no servers.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="h-ico">&#128276;</span>Preferences</h2>
+      <div class="body">
+        <label class="switch"><input type="checkbox" id="setNotify" /> <span>Notify me about new messages</span></label>
+        <label class="switch" id="bgRow"><input type="checkbox" id="setBackground" /> <span>Stay connected in the background</span></label>
+        <div class="note" id="bgNote">Keeps your radios connected while Backtrail is in the background, so messages still
+          arrive. Shows a persistent notification and uses more battery.</div>
+        <label class="switch"><input type="checkbox" id="setLocCheckin" /> <span>Include my location in check-ins</span></label>
+        <label class="switch"><input type="checkbox" id="setTiles" /> <span>Street map (downloads map images from OpenStreetMap)</span></label>
+        <div class="note">Off by default: the radar map works with no internet. Turning this on sends map-tile
+          requests, which reveal the area you are viewing, to OpenStreetMap's servers.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="h-ico">&#128451;</span>Data</h2>
+      <div class="body">
+        <div class="note" id="dataStats"></div>
+        <div class="btn-grid">
+          <button class="ghost" id="clearHistoryBtn">Clear message history</button>
+          <button class="ghost" id="clearContactsBtn">Delete all contacts</button>
+        </div>
+        <button class="ghost" id="aboutBtn2">About, terms &amp; privacy</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Independent app from BlackFox Media LLC. goTenna Mesh® is a registered trademark, and goTenna™ is a trademark, of goTenna, Inc.
+  Meshtastic® is a registered trademark of Meshtastic LLC. Neither is affiliated with or endorses this app. Not for emergency communications.
+  © 2026 BlackFox Media LLC. All rights reserved.
+</footer>
+
+<!-- General-purpose sheet (QR codes, contact editor, confirmations) -->
+<dialog id="sheet" aria-labelledby="sheetTitle">
+  <div class="about-head">
+    <h2 id="sheetTitle"></h2>
+    <button class="ghost icon-btn" id="sheetClose" aria-label="Close">✕</button>
+  </div>
+  <div class="sheet-body" id="sheetBody"></div>
+</dialog>
+
+<dialog id="aboutDlg" aria-labelledby="aboutTitle">
+  <div class="about-head">
+    <h2 id="aboutTitle">Backtrail</h2>
+    <button class="ghost icon-btn" id="aboutClose" aria-label="Close">✕</button>
+  </div>
+  <div class="about-body">
+    <img class="about-hero" src="assets/backtrail-hero.jpg" alt="Backtrail" width="1200" height="718" />
+    <h3>About</h3>
+    <p>Backtrail is an independent off-grid messaging app for goTenna Mesh® radios and Meshtastic® LoRa radios. It
+      connects to radios you own over Bluetooth (or USB for Meshtastic in desktop browsers) to send and receive text
+      messages, check-ins, locations, and SOS alerts; keep a message history and contacts; show people and your
+      breadcrumb trail on a map; list the nodes on a Meshtastic mesh; and read and change supported radio settings. It
+      needs no account, no servers, and no internet connection.</p>
+    <!-- Version: keep in sync with the store build's version -->
+    <p>Version 1.0.0<br>© 2026 BlackFox Media LLC. All rights reserved.</p>
+
+    <h3>Trademarks &amp; Non-Affiliation</h3>
+    <p>goTenna Mesh® is a registered trademark, and goTenna™ is a trademark, of goTenna, Inc. Meshtastic® is a registered
+      trademark of Meshtastic LLC. BlackFox Media LLC is not affiliated with, authorized by, endorsed by, sponsored by, or
+      in any way officially connected to goTenna, Inc., Meshtastic LLC, or the Meshtastic project. These names are used
+      only to identify the hardware and networks this app works with, which is nominative fair use. Backtrail is not an
+      official Meshtastic app. All other trademarks belong to their respective owners.</p>
+
+    <h3>Independent Interoperability Software</h3>
+    <p>Backtrail was developed independently by BlackFox Media LLC so that people can keep using radio hardware they
+      already own. Its goTenna support contains no goTenna, Inc. software, SDK, source code, or brand assets, and it was
+      not built under any goTenna license. goTenna, Inc. does not support this app; do not contact goTenna, Inc. for help
+      with it.</p>
+    <p>Its Meshtastic support uses the open-source Meshtastic JavaScript libraries (@meshtastic/core and its transports,
+      GPL-3.0) and the public Meshtastic protocol, without modification of their licensing. The Meshtastic project and
+      Meshtastic LLC do not support this app; please do not ask the Meshtastic community or its developers for help with
+      Backtrail. Contact BlackFox Media LLC instead.</p>
+
+    <h3>Terms of Service</h3>
+    <p>Backtrail is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+      License, version 3 (GPL-3.0), as published by the Free Software Foundation. The purchase price covers the
+      convenience of the store build; the source code is available at no charge (see "Source Code" below). Nothing in
+      these terms limits the rights the GPL-3.0 gives you. Backtrail is a general-purpose messaging utility; it is not a
+      certified communications product, and message delivery is never guaranteed. Radio range, terrain, interference,
+      battery level, device firmware, mesh settings, and the presence of other devices all affect whether a message
+      arrives. Delivery receipts, signal readings, hop counts, distances, bearings, and positions are estimates and may
+      be wrong.</p>
+    <p>The app is provided "as is" and "as available" without warranties of any kind, express or implied, including
+      merchantability, fitness for a particular purpose, accuracy, and non-infringement. Purchases are handled entirely by
+      the store you bought from (Google Play or the Apple App Store) and refunds are governed by that store's policy;
+      BlackFox Media LLC cannot issue them.</p>
+
+    <h3>Not for Emergency Use</h3>
+    <p>DO NOT RELY ON THIS APP FOR EMERGENCY, LIFE-SAFETY, OR MISSION-CRITICAL COMMUNICATIONS. The SOS feature only sends
+      a message to other radios in range; it does NOT contact 911, search and rescue, or any emergency service, and no one
+      may receive it. Messages may be delayed or lost without notice, locations may be inaccurate, and the app or device
+      may fail at any time. In an emergency, call 911 or your local emergency number by any available means. Carry an
+      independent means of summoning help, such as a satellite messenger or personal locator beacon, whenever you travel
+      off-grid. Do not use the map, breadcrumb trail, or "back to start" feature as your only means of navigation; carry
+      a map and compass and know how to use them.</p>
+
+    <h3>Radio Use &amp; Regulatory Compliance</h3>
+    <p>You are solely responsible for operating your radios lawfully where you are, including selecting the RF region
+      that matches your physical location and following any local rules on transmit power, duty cycle, and encryption.
+      Selecting a region that does not match your location may violate radio regulations. Backtrail only issues commands
+      that each device's own firmware supports; it does not modify a radio's certified power or frequency
+      characteristics. Changing Meshtastic radio settings (region, modem preset, role, or channels) can disconnect you
+      from your mesh; make changes only if you understand them.</p>
+
+    <h3>Third-Party Hardware &amp; Firmware</h3>
+    <p>Backtrail controls hardware and firmware made by third parties, including goTenna Mesh devices, whose maker has
+      discontinued consumer support, and Meshtastic-compatible radios from various manufacturers. BlackFox Media LLC did
+      not make your device and makes no warranty about it. Any device configuration, region change, channel change,
+      reboot, firmware recovery, or firmware update you perform is at your own risk and may render the device inoperable
+      or void any remaining manufacturer warranty. BlackFox Media LLC is not responsible for loss of, damage to, or
+      malfunction of any device.</p>
+
+    <h3>Message Privacy</h3>
+    <p>Radio transmissions can be received by any compatible device in range. On goTenna, messages sent without
+      encryption are public. When you set a group passphrase and turn on encryption, the message content (including any
+      location) and your nickname are encrypted with AES-256-GCM using a key derived from that passphrase, so only devices
+      running Backtrail with the same passphrase can read them. On Meshtastic, messages use the encryption of the channel
+      they are sent on: the default public channel's key is widely known, so treat it as public, and anyone with a
+      channel's link or QR code can read that channel. Encryption does not hide that a message was sent, its size, its
+      timing, or the sender's device ID, and anyone who knows a passphrase or channel key can read every message protected
+      by it. Locations you send in a check-in, location share, or SOS are visible to everyone who can read that message.
+      Share passphrases, invite codes, and channel QR codes only with people you trust. No encryption is guaranteed to be
+      unbreakable; do not rely on this app to protect information where disclosure could cause serious harm.</p>
+
+    <h3>Limitation of Liability</h3>
+    <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, BLACKFOX MEDIA LLC AND ITS OWNERS, MEMBERS, OFFICERS, EMPLOYEES,
+      AGENTS, AND CONTRACTORS SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, PUNITIVE, OR
+      EXEMPLARY DAMAGES, NOR FOR ANY PERSONAL INJURY, DEATH, FAILED OR DELAYED COMMUNICATION, LOST OR UNDELIVERED MESSAGE,
+      DAMAGED OR INOPERABLE DEVICE, LOST DATA, OR OTHER ECONOMIC LOSS, ARISING OUT OF OR RELATING TO YOUR USE OF OR RELIANCE
+      ON THIS APP — EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. WHERE THE LAW DOES NOT PERMIT CERTAIN EXCLUSIONS,
+      LIABILITY IS LIMITED TO THE GREATEST EXTENT ALLOWED, AND IN NO EVENT EXCEEDS THE AMOUNT YOU PAID FOR THE APP IN THE
+      TWELVE MONTHS PRECEDING THE CLAIM.</p>
+
+    <h3>Release of Claims &amp; Indemnification</h3>
+    <p>By using this app you release, waive, and covenant not to sue BlackFox Media LLC and the parties named above for any
+      claim arising from your use of it or reliance on it. You agree to indemnify and hold them harmless from any claim,
+      loss, damage, liability, cost, or expense (including reasonable legal fees) arising from your use or misuse of the
+      app, your operation of any radio device, your violation of these terms, or your violation of any law or third-party
+      right.</p>
+
+    <h3>Governing Law</h3>
+    <p>These terms are governed by the laws of the State of Texas, without regard to conflict-of-law provisions. Any action
+      arising under them shall be brought exclusively in the state or federal courts located in Texas. If any provision is
+      found unenforceable, it shall be modified to the minimum extent necessary to make it enforceable and the remainder
+      shall continue in full force. Nothing here limits any non-waivable consumer rights you have under the law of your own
+      jurisdiction.</p>
+
+    <h3>Changes to These Terms</h3>
+    <p>These terms may be updated from time to time. Continued use of the app following an update constitutes acceptance
+      of the revised terms.</p>
+
+    <h3>Privacy</h3>
+    <p>No account is required and there is no sign-in. BlackFox Media LLC operates no server for this app and receives no
+      data from it. The app contains no advertising, no analytics or crash-reporting SDK, and no third-party trackers. No
+      personal data is collected, sold, or shared by BlackFox Media LLC.</p>
+    <p>Stored on your device only: your nickname, IDs, passphrase, settings, message history, contacts, and breadcrumb
+      trail. You can delete them in Settings → Data, or by uninstalling the app.</p>
+    <p>Location: used only while the app is open, when you open the map, record a trail, or send a location, check-in,
+      or SOS. Your location leaves your device only inside messages you choose to send over radio. Backtrail never
+      tracks your location in the background.</p>
+    <p>Camera: used only to scan QR codes when you tap Scan QR. Images are not saved or sent anywhere.</p>
+    <p>Notifications: shown on your device for incoming messages; they are not sent through any server.</p>
+    <p>Optional street map: off by default. If you turn it on, map images are downloaded from OpenStreetMap's tile
+      servers, which receive your device's IP address and the map area you view, under the OpenStreetMap Foundation's
+      privacy policy. The default radar map uses no internet.</p>
+    <p>Full privacy policy: <a href="https://www.blackfox-media.com/privacy-policy" target="_blank" rel="noopener">www.blackfox-media.com/privacy-policy</a></p>
+
+    <h3>Source Code &amp; License</h3>
+    <p>Backtrail is © 2026 BlackFox Media LLC and is licensed under the GNU General Public License v3.0. This program is
+      distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GPL-3.0 for details:
+      <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener">gnu.org/licenses/gpl-3.0</a>.</p>
+    <p>The complete corresponding source code is available free of charge from BlackFox Media LLC. Request it at
+      support@blackfox-media.com; this offer is valid for at least three years from the date you obtained the app.
+      Backtrail does not include goTenna, Inc. firmware or software, or Meshtastic firmware.</p>
+    <p>Open-source components: Meshtastic JavaScript libraries (@meshtastic/core, transport-web-bluetooth,
+      transport-web-serial; GPL-3.0), protobuf-es (Apache-2.0), Capacitor and its plugins (MIT), Leaflet (BSD-2-Clause),
+      and qrcode-generator (MIT). Map data © OpenStreetMap contributors (ODbL), shown only if you enable the street map.
+      Protocol research by the pyGT project (MIT License) informed this app's independent goTenna implementation. See
+      the third-party notices distributed with the app.</p>
+
+    <h3>Contact</h3>
+    <p>Questions, corrections, or concerns:<br>
+      Developer: BlackFox Media LLC<br>
+      Website: blackfox-media.com<br>
+      Support: support@blackfox-media.com</p>
+    <p>BlackFox Media LLC — Texas, United States<br>Effective date: October 11, 2026</p>
+    <div class="about-foot">Backtrail · BlackFox Media LLC</div>
+  </div>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

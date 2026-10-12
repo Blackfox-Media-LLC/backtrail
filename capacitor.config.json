@@ -1,0 +1,25 @@
+{
+  "appId": "com.blackfoxmedia.backtrail",
+  "appName": "Backtrail",
+  "webDir": "webapp",
+  "backgroundColor": "#0e1116",
+  "android": {
+    "allowMixedContent": false,
+    "adjustMarginsForEdgeToEdge": "disable",
+    "backgroundColor": "#0e1116"
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#0e1116"
+  },
+  "plugins": {
+    "BluetoothLe": {
+      "displayStrings": {
+        "scanning": "Searching for radios…",
+        "cancel": "Cancel",
+        "availableDevices": "Radios nearby",
+        "noDeviceFound": "No radios found. Make sure yours is on and not connected to another app."
+      }
+    }
+  }
+}
